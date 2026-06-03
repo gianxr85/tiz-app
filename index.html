@@ -577,23 +577,38 @@ td.strong { color: var(--text); font-weight: 500; }
         <p style="font-size:11px;color:var(--text3);margin:0">Cada sector puede escribir sus propias notas. Se guarda con fecha y hora automáticamente.</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="form-group">
-            <label style="color:var(--blue)">📦 Producción <span id="nota-ts-produccion" style="font-size:10px;color:var(--text3);font-weight:400"></span></label>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <label style="color:var(--blue);margin:0">📦 Producción <span id="nota-ts-produccion" style="font-size:10px;color:var(--text3);font-weight:400"></span></label>
+              <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 7px" onclick="crearTareaDesdeNota('Producción')">📅 Tarea</button>
+            </div>
             <textarea id="nota-produccion" placeholder="Notas del sector Producción..." style="min-height:60px"></textarea>
           </div>
           <div class="form-group">
-            <label style="color:var(--teal)">🚛 Colocaciones <span id="nota-ts-colocaciones" style="font-size:10px;color:var(--text3);font-weight:400"></span></label>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <label style="color:var(--teal);margin:0">🚛 Colocaciones <span id="nota-ts-colocaciones" style="font-size:10px;color:var(--text3);font-weight:400"></span></label>
+              <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 7px" onclick="crearTareaDesdeNota('Colocaciones')">📅 Tarea</button>
+            </div>
             <textarea id="nota-colocaciones" placeholder="Notas del sector Colocaciones..." style="min-height:60px"></textarea>
           </div>
           <div class="form-group">
-            <label style="color:var(--purple)">✏️ Diseño <span id="nota-ts-diseno" style="font-size:10px;color:var(--text3);font-weight:400"></span></label>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <label style="color:var(--purple);margin:0">✏️ Diseño <span id="nota-ts-diseno" style="font-size:10px;color:var(--text3);font-weight:400"></span></label>
+              <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 7px" onclick="crearTareaDesdeNota('Diseño')">📅 Tarea</button>
+            </div>
             <textarea id="nota-diseno" placeholder="Notas del sector Diseño..." style="min-height:60px"></textarea>
           </div>
           <div class="form-group">
-            <label style="color:var(--amber)">💰 Ventas <span id="nota-ts-ventas" style="font-size:10px;color:var(--text3);font-weight:400"></span></label>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <label style="color:var(--amber);margin:0">💰 Ventas <span id="nota-ts-ventas" style="font-size:10px;color:var(--text3);font-weight:400"></span></label>
+              <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 7px" onclick="crearTareaDesdeNota('Ventas')">📅 Tarea</button>
+            </div>
             <textarea id="nota-ventas" placeholder="Notas del sector Ventas..." style="min-height:60px"></textarea>
           </div>
           <div class="form-group">
-            <label style="color:var(--accent)">🛒 Compras <span id="nota-ts-compras" style="font-size:10px;color:var(--text3);font-weight:400"></span></label>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <label style="color:var(--accent);margin:0">🛒 Compras <span id="nota-ts-compras" style="font-size:10px;color:var(--text3);font-weight:400"></span></label>
+              <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 7px" onclick="crearTareaDesdeNota('Compras')">📅 Tarea</button>
+            </div>
             <textarea id="nota-compras" placeholder="Notas del sector Compras..." style="min-height:60px"></textarea>
           </div>
         </div>
@@ -713,10 +728,23 @@ td.strong { color: var(--text); font-weight: 500; }
     <div class="modal-title">Nueva tarea</div>
     <input type="hidden" id="tarea-id">
     <div class="form-grid">
-      <div class="form-group full"><label>Obra</label>
-        <select id="ft-obra-id" onchange="fillTareaObra(this.value)">
+      <div class="form-group full">
+        <label>Buscar obra</label>
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <input id="ft-buscar-ot" placeholder="Buscar por OT, descripción o cliente..." oninput="filtrarObrasModal()" style="flex:1">
+          <select id="ft-filtro-estado" onchange="filtrarObrasModal()" style="width:160px">
+            <option value="">Todos los estados</option>
+            <option>Aprobado</option>
+            <option>En producción</option>
+            <option>Entregado</option>
+            <option>Facturado</option>
+            <option>Cobrado</option>
+          </select>
+        </div>
+        <select id="ft-obra-id" onchange="fillTareaObra(this.value)" size="5" style="width:100%;min-height:110px;border-radius:8px;padding:4px">
           <option value="">— Seleccionar obra —</option>
         </select>
+        <div id="ft-obras-count" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
       </div>
       <div class="form-group full"><label>Descripción de la tarea</label>
         <input id="ft-desc" placeholder="Ej: Imprimir lonas para Farmacity Florida 441">
@@ -1604,22 +1632,73 @@ window.setTareaTab = (tab, el) => {
   renderTareas();
 };
 
+window.crearTareaDesdeNota = (sector) => {
+  const sectorKeys = {'Producción':'produccion','Colocaciones':'colocaciones','Diseño':'diseno','Ventas':'ventas','Compras':'compras'};
+  const nota = document.getElementById('nota-'+sectorKeys[sector])?.value.trim();
+  const obraId = window.editingId.obra;
+  const obra = obraId ? window.DB.obras.find(x => x.id === obraId) : null;
+
+  // Cerrar modal de obra y abrir modal de tarea precargado
+  closeModal('obra');
+
+  setTimeout(() => {
+    window.editingId.tarea = null;
+    // Limpiar filtros y cargar todas las obras
+    const buscarEl = document.getElementById('ft-buscar-ot');
+    if (buscarEl) buscarEl.value = '';
+    const estadoEl = document.getElementById('ft-filtro-estado');
+    if (estadoEl) estadoEl.value = '';
+    filtrarObrasModal();
+    // Seleccionar la obra actual
+    const sel = document.getElementById('ft-obra-id');
+    if (sel && obraId) sel.value = obraId;
+
+    // Precargar campos
+    document.getElementById('ft-desc').value = nota || (obra ? `${obra.desc||''} — ${obra.cliente||''}` : '');
+    document.getElementById('ft-sector').value = sector;
+    document.getElementById('ft-notas').value = nota || '';
+    const fecha = document.getElementById('ft-fecha');
+    if (obra?.fprod_c) fecha.value = obra.fprod_c;
+    else fecha.value = '';
+    document.getElementById('ft-hora-ini').value = '09:00';
+    document.getElementById('ft-hora-fin').value = '11:00';
+
+    document.getElementById('modal-tarea').classList.add('open');
+  }, 150);
+};
+window.filtrarObrasModal = () => {
+  const q = (document.getElementById('ft-buscar-ot')?.value || '').toLowerCase();
+  const estado = document.getElementById('ft-filtro-estado')?.value || '';
+  const sel = document.getElementById('ft-obra-id');
+  const current = sel?.value;
+  let obras = window.DB.obras;
+  if (estado) obras = obras.filter(o => o.estado === estado);
+  if (q) obras = obras.filter(o =>
+    (o.ot||'').toLowerCase().includes(q) ||
+    (o.desc||'').toLowerCase().includes(q) ||
+    (o.cliente||'').toLowerCase().includes(q)
+  );
+  obras = obras.sort((a,b) => (b.semana||0)-(a.semana||0));
+  if (sel) {
+    sel.innerHTML = '<option value="">— Seleccionar obra —</option>' +
+      obras.map(o => `<option value="${o.id}" ${o.id===current?'selected':''}>[Sem ${o.semana||'—'}] ${o.ot||'S/N'} — ${o.desc||''} · ${o.cliente||''} · ${o.estado||''}</option>`).join('');
+  }
+  const cnt = document.getElementById('ft-obras-count');
+  if (cnt) cnt.textContent = obras.length + ' obra' + (obras.length !== 1 ? 's' : '');
+};
+
 window.openNuevaTarea = () => {
   window.editingId.tarea = null;
-  ['ft-desc','ft-fecha','ft-hora-ini','ft-hora-fin','ft-notas'].forEach(id => {
+  ['ft-desc','ft-fecha','ft-hora-ini','ft-hora-fin','ft-notas','ft-buscar-ot'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
-  // Llenar selector de obras activas
-  const sel = document.getElementById('ft-obra-id');
-  sel.innerHTML = '<option value="">— Seleccionar obra —</option>' +
-    window.DB.obras
-      .filter(o => !['Cobrado'].includes(o.estado))
-      .sort((a,b) => (b.semana||0)-(a.semana||0))
-      .map(o => `<option value="${o.id}">[Sem ${o.semana||'—'}] ${o.ot||''} — ${o.desc||''} (${o.cliente||''})</option>`)
-      .join('');
-  // Pre-seleccionar sector del usuario
+  const estadoEl = document.getElementById('ft-filtro-estado');
+  if (estadoEl) estadoEl.value = 'En producción';
+  filtrarObrasModal();
   const sectorSel = document.getElementById('ft-sector');
-  if (window.currentUser) sectorSel.value = window.currentUser.sector;
+  if (window.currentUser && sectorSel) sectorSel.value = window.currentUser.sector;
+  document.getElementById('ft-hora-ini').value = '09:00';
+  document.getElementById('ft-hora-fin').value = '11:00';
   openModal('tarea');
 };
 
