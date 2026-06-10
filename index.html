@@ -576,13 +576,12 @@ td.strong { color: var(--text); font-weight: 500; }
         </div>
       </div>
       <div style="padding:16px 28px 0">
-        <!-- KPIs acumulados -->
         <div class="kpi-grid" id="est-kpis"></div>
-        <!-- Tabs -->
         <div class="page-tabs" style="margin-bottom:16px">
           <button class="page-tab active" onclick="setEstTab('tabla',this)">Por semana</button>
           <button class="page-tab" onclick="setEstTab('mensual',this)">Por mes</button>
           <button class="page-tab" onclick="setEstTab('metas',this)">Metas</button>
+          <button class="page-tab" onclick="setEstTab('cumplimiento',this)">Cumplimiento</button>
         </div>
         <div id="est-content"></div>
       </div>
@@ -2089,7 +2088,8 @@ function renderEstadistica() {
 
   if (window.estTab === 'tabla') renderEstTabla(bySem, sems);
   else if (window.estTab === 'mensual') renderEstMensual(bySem, sems);
-  else renderEstMetas();
+  else if (window.estTab === 'metas') renderEstMetas();
+  else if (window.estTab === 'cumplimiento') renderEstCumplimiento();
 }
 
 function pctBar(val, meta) {
@@ -2232,6 +2232,207 @@ function renderEstMetas() {
 
   document.getElementById('est-content').innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0">${cards}</div>`;
 }
+
+function renderEstCumplimiento() {
+  const obras = window.DB.obras;
+  const conFProd = obras.filter(o => o.fprod_c);
+  const prodEnFecha  = conFProd.filter(o => semaforo(o.fprod_c,o.fprod_r)==='g').length;
+  const prodVencida  = conFProd.filter(o => semaforo(o.fprod_c,o.fprod_r)==='r').length;
+  const prodEnRiesgo = conFProd.filter(o => semaforo(o.fprod_c,o.fprod_r)==='a').length;
+  const prodSinFecha = obras.filter(o => !o.fprod_c).length;
+  const conFCol = obras.filter(o => o.fcol_c);
+  const colEnFecha   = conFCol.filter(o => semaforo(o.fcol_c,o.fcol_r)==='g').length;
+  const colVencida   = conFCol.filter(o => semaforo(o.fcol_c,o.fcol_r)==='r').length;
+  const colEnRiesgo  = conFCol.filter(o => semaforo(o.fcol_c,o.fcol_r)==='a').length;
+  const colSinFecha  = obras.filter(o => !o.fcol_c).length;
+
+  // --- Cobranzas ---
+  const cobr = window.DB.cobranzas;
+  const cobrCobradas  = cobr.filter(c => c.estado==='Cobrado').length;
+  const cobrPendiente = cobr.filter(c => c.estado==='Pendiente' && diasDesdeHoy(c.vencimiento)<0).length;
+  const cobrVencidas  = cobr.filter(c => c.estado==='Pendiente' && diasDesdeHoy(c.vencimiento)>=0).length;
+  const cobrTotalMonto = cobr.reduce((a,c)=>a+(+c.importe||0),0);
+  const cobrCobradoMonto = cobr.filter(c=>c.estado==='Cobrado').reduce((a,c)=>a+(+c.importe||0),0);
+  const cobrPendMonto = cobr.filter(c=>c.estado!=='Cobrado').reduce((a,c)=>a+(+c.importe||0),0);
+  const SECTORS = ['Producción','Colocaciones','Diseño','Ventas','Compras'];
+  const COLORS_SEC = {'Producción':'#5b9cf6','Colocaciones':'#3dbfa0','Diseño':'#9b7ff4','Ventas':'#e8a020','Compras':'#e8b84b'};
+  const sectorData = SECTORS.map(sec => {
+    const ws = obras.filter(o=>o.sector===sec&&o.fprod_c);
+    const ok = ws.filter(o=>semaforo(o.fprod_c,o.fprod_r)==='g').length;
+    const mal = ws.filter(o=>semaforo(o.fprod_c,o.fprod_r)==='r').length;
+    const riesgo = ws.filter(o=>semaforo(o.fprod_c,o.fprod_r)==='a').length;
+    const pct = ws.length?Math.round(ok/ws.length*100):0;
+    return {sec,ok,mal,riesgo,total:ws.length,pct};
+  });
+
+  document.getElementById('est-content').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+      <div class="card">
+        <div class="card-header"><span class="card-title">📦 Cumplimiento producción</span></div>
+        <div class="card-body" style="display:flex;flex-direction:column;align-items:center;gap:14px">
+          <div style="position:relative;width:200px;height:200px">
+            <canvas id="chart-prod" width="200" height="200"></canvas>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center">
+              <div style="font-size:26px;font-weight:700;color:var(--green)">${conFProd.length?Math.round(prodEnFecha/conFProd.length*100):0}%</div>
+              <div style="font-size:10px;color:var(--text3)">en fecha</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;font-size:12px;color:var(--text2)">
+            <span><span style="display:inline-block;width:10px;height:10px;background:#4caf7d;border-radius:2px;margin-right:4px"></span>En fecha: <b>${prodEnFecha}</b></span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:#e8a020;border-radius:2px;margin-right:4px"></span>En riesgo: <b>${prodEnRiesgo}</b></span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:#e05c5c;border-radius:2px;margin-right:4px"></span>Vencida: <b>${prodVencida}</b></span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:#444;border-radius:2px;margin-right:4px"></span>Sin fecha: <b>${prodSinFecha}</b></span>
+          </div>
+          <div style="font-size:11px;color:var(--text3)">Total con fecha: ${conFProd.length} obras</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">🚛 Cumplimiento colocaciones</span></div>
+        <div class="card-body" style="display:flex;flex-direction:column;align-items:center;gap:14px">
+          <div style="position:relative;width:200px;height:200px">
+            <canvas id="chart-col" width="200" height="200"></canvas>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center">
+              <div style="font-size:26px;font-weight:700;color:var(--green)">${conFCol.length?Math.round(colEnFecha/conFCol.length*100):0}%</div>
+              <div style="font-size:10px;color:var(--text3)">en fecha</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;font-size:12px;color:var(--text2)">
+            <span><span style="display:inline-block;width:10px;height:10px;background:#4caf7d;border-radius:2px;margin-right:4px"></span>En fecha: <b>${colEnFecha}</b></span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:#e8a020;border-radius:2px;margin-right:4px"></span>En riesgo: <b>${colEnRiesgo}</b></span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:#e05c5c;border-radius:2px;margin-right:4px"></span>Vencida: <b>${colVencida}</b></span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:#444;border-radius:2px;margin-right:4px"></span>Sin fecha: <b>${colSinFecha}</b></span>
+          </div>
+          <div style="font-size:11px;color:var(--text3)">Total con fecha: ${conFCol.length} obras</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cobranzas torta -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header"><span class="card-title">💰 Estado de cobranzas</span></div>
+      <div class="card-body" style="display:grid;grid-template-columns:200px 1fr;gap:24px;align-items:center">
+        <div style="position:relative;width:200px;height:200px">
+          <canvas id="chart-cobr" width="200" height="200"></canvas>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center">
+            <div style="font-size:22px;font-weight:700;color:var(--green)">${cobr.length?Math.round(cobrCobradas/cobr.length*100):0}%</div>
+            <div style="font-size:10px;color:var(--text3)">cobrado</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="font-size:12px;color:var(--text2)"><span style="display:inline-block;width:10px;height:10px;background:#4caf7d;border-radius:2px;margin-right:6px"></span>Cobrado</span>
+              <span style="font-size:12px;font-weight:500;color:var(--green)">${cobrCobradas} facturas · ${fmtM(cobrCobradoMonto)}</span>
+            </div>
+            <div style="height:6px;background:var(--border);border-radius:3px">
+              <div style="width:${cobr.length?Math.round(cobrCobradas/cobr.length*100):0}%;height:6px;background:#4caf7d;border-radius:3px"></div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="font-size:12px;color:var(--text2)"><span style="display:inline-block;width:10px;height:10px;background:#e8a020;border-radius:2px;margin-right:6px"></span>Pendiente</span>
+              <span style="font-size:12px;font-weight:500;color:var(--amber)">${cobrPendiente} facturas</span>
+            </div>
+            <div style="height:6px;background:var(--border);border-radius:3px">
+              <div style="width:${cobr.length?Math.round(cobrPendiente/cobr.length*100):0}%;height:6px;background:#e8a020;border-radius:3px"></div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="font-size:12px;color:var(--text2)"><span style="display:inline-block;width:10px;height:10px;background:#e05c5c;border-radius:2px;margin-right:6px"></span>Vencida</span>
+              <span style="font-size:12px;font-weight:500;color:var(--red)">${cobrVencidas} facturas</span>
+            </div>
+            <div style="height:6px;background:var(--border);border-radius:3px">
+              <div style="width:${cobr.length?Math.round(cobrVencidas/cobr.length*100):0}%;height:6px;background:#e05c5c;border-radius:3px"></div>
+            </div>
+          </div>
+          <div style="padding-top:8px;border-top:1px solid var(--border);display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:var(--text3)">Total cobrado: <b style="color:var(--green)">${fmtM(cobrCobradoMonto)}</b></span>
+            <span style="font-size:12px;color:var(--text3)">Pendiente: <b style="color:var(--amber)">${fmtM(cobrPendMonto)}</b></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Cumplimiento de producción por sector</span></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:center">
+          <div style="position:relative;height:220px"><canvas id="chart-sector"></canvas></div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            ${sectorData.map(d=>`
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                  <span style="font-size:12px;font-weight:500;color:${COLORS_SEC[d.sec]}">${d.sec}</span>
+                  <span style="font-size:12px;color:var(--text2)">${d.ok}/${d.total} · <b style="color:${d.pct>=80?'var(--green)':d.pct>=60?'var(--amber)':'var(--red)'}">${d.pct}%</b></span>
+                </div>
+                <div style="height:6px;background:var(--border);border-radius:3px">
+                  <div style="width:${d.pct}%;height:6px;background:${COLORS_SEC[d.sec]};border-radius:3px"></div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const drawCharts = () => {
+    if (window._chartProd) { try{window._chartProd.destroy();}catch(e){} }
+    if (window._chartCol)  { try{window._chartCol.destroy();}catch(e){} }
+    if (window._chartSec)  { try{window._chartSec.destroy();}catch(e){} }
+    if (window._chartCobr) { try{window._chartCobr.destroy();}catch(e){} }
+    const donutOpts = {
+      cutout:'65%',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw}`}}},
+      animation:{animateRotate:true,duration:700}
+    };
+    window._chartProd = new Chart(document.getElementById('chart-prod'),{
+      type:'doughnut',
+      data:{labels:['En fecha','En riesgo','Vencida','Sin fecha'],
+        datasets:[{data:[prodEnFecha,prodEnRiesgo,prodVencida,prodSinFecha],
+          backgroundColor:['#4caf7d','#e8a020','#e05c5c','#2a2a2a'],borderWidth:0,hoverOffset:4}]},
+      options:donutOpts
+    });
+    window._chartCol = new Chart(document.getElementById('chart-col'),{
+      type:'doughnut',
+      data:{labels:['En fecha','En riesgo','Vencida','Sin fecha'],
+        datasets:[{data:[colEnFecha,colEnRiesgo,colVencida,colSinFecha],
+          backgroundColor:['#4caf7d','#e8a020','#e05c5c','#2a2a2a'],borderWidth:0,hoverOffset:4}]},
+      options:donutOpts
+    });
+    window._chartCobr = new Chart(document.getElementById('chart-cobr'),{
+      type:'doughnut',
+      data:{labels:['Cobrado','Pendiente','Vencida'],
+        datasets:[{data:[cobrCobradas,cobrPendiente,cobrVencidas],
+          backgroundColor:['#4caf7d','#e8a020','#e05c5c'],borderWidth:0,hoverOffset:4}]},
+      options:donutOpts
+    });
+    window._chartSec = new Chart(document.getElementById('chart-sector'),{
+      type:'bar',
+      data:{
+        labels:sectorData.map(d=>d.sec),
+        datasets:[
+          {label:'En fecha',data:sectorData.map(d=>d.ok),backgroundColor:'#4caf7d',borderRadius:4},
+          {label:'Vencida',data:sectorData.map(d=>d.mal),backgroundColor:'#e05c5c',borderRadius:4},
+          {label:'En riesgo',data:sectorData.map(d=>d.riesgo),backgroundColor:'#e8a020',borderRadius:4},
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#a09e9a',font:{size:11}}}},
+        scales:{
+          x:{stacked:true,ticks:{color:'#888780',font:{size:11}},grid:{display:false}},
+          y:{stacked:true,ticks:{color:'#888780',font:{size:11}},grid:{color:'rgba(255,255,255,0.05)'}}
+        }
+      }
+    });
+  };
+  if (typeof Chart==='undefined') {
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';
+    s.onload=drawCharts; document.head.appendChild(s);
+  } else { setTimeout(drawCharts,50); }
+}
+
 window.exportarCSV = () => {
   const obras = [...window.DB.obras].sort((a,b) => (+b.semana||0) - (+a.semana||0));
   if (!obras.length) { showToast('No hay obras para exportar'); return; }
