@@ -317,19 +317,24 @@ td.strong { color: var(--text); font-weight: 500; }
       <div class="page-header">
         <div><div class="page-title">Obras</div><div class="page-subtitle">Pipeline completo</div></div>
         <div class="header-actions">
-          <button class="btn btn-ghost btn-sm" onclick="exportarCSV()"><i class="ti ti-download"></i> Exportar CSV</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportarExcel()"><i class="ti ti-file-spreadsheet"></i> Excel</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportarCSV()"><i class="ti ti-download"></i> CSV</button>
           <button class="btn btn-primary btn-sm" onclick="window.editingId.obra=null;openModal('obra')"><i class="ti ti-plus"></i> Nueva obra</button>
         </div>
       </div>
       <div style="padding:16px 28px 0">
         <div class="sector-tabs" id="obras-sectors"></div>
         <div class="filters">
+          <input type="text" id="filter-ot" placeholder="🔍 OT o descripción..." oninput="renderObras()" style="width:180px">
           <select id="filter-estado" onchange="renderObras()">
             <option value="">Todos los estados</option>
             <option>Presupuestado</option><option>Aprobado</option><option>En producción</option>
             <option>Entregado</option><option>Facturado</option><option>Cobrado</option>
           </select>
-          <input type="text" id="filter-cliente" placeholder="Buscar cliente..." oninput="renderObras()" style="width:160px">
+          <input type="text" id="filter-cliente" placeholder="Cliente..." oninput="renderObras()" style="width:140px">
+          <input type="number" id="filter-semana-desde" placeholder="Sem desde" oninput="renderObras()" style="width:90px">
+          <input type="number" id="filter-semana-hasta" placeholder="Sem hasta" oninput="renderObras()" style="width:90px">
+          <button class="btn btn-ghost btn-sm" onclick="limpiarFiltros()">Limpiar</button>
           <span class="filter-count" id="obras-count"></span>
         </div>
         <div class="card">
@@ -437,6 +442,7 @@ td.strong { color: var(--text); font-weight: 500; }
       <div class="page-header">
         <div><div class="page-title">Gestión de cobranzas</div></div>
         <div class="header-actions">
+          <button class="btn btn-ghost btn-sm" onclick="cargarDesdeOTs()"><i class="ti ti-file-import"></i> Cargar desde OTs</button>
           <button class="btn btn-primary btn-sm" onclick="openModal('cobranza')"><i class="ti ti-plus"></i> Registrar cobro</button>
         </div>
       </div>
@@ -446,6 +452,15 @@ td.strong { color: var(--text); font-weight: 500; }
           <button class="page-tab active" onclick="setCobTab('pendientes',this)">Pendientes</button>
           <button class="page-tab" onclick="setCobTab('cobradas',this)">Cobradas</button>
           <button class="page-tab" onclick="setCobTab('todas',this)">Todas</button>
+        </div>
+        <div class="filters">
+          <input type="text" id="cobr-filter-cliente" placeholder="Buscar cliente u OT..." oninput="renderCobranzas()" style="width:200px">
+          <select id="cobr-filter-estado" onchange="renderCobranzas()">
+            <option value="">Todos</option>
+            <option>Pendiente</option><option>Cobrado</option><option>Vencido</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('cobr-filter-cliente').value='';document.getElementById('cobr-filter-estado').value='';renderCobranzas()">Limpiar</button>
+          <span class="filter-count" id="cobr-count"></span>
         </div>
         <div class="card">
           <div class="table-wrap"><table>
@@ -660,13 +675,13 @@ td.strong { color: var(--text); font-weight: 500; }
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('obra')">Cancelar</button>
-      <button class="btn btn-ghost" onclick="abrirPresupuesto()" style="color:var(--accent);border-color:var(--accent)"><i class="ti ti-file-invoice"></i> Generar presupuesto</button>
+      <button class="btn btn-ghost" onclick="abrirPresupuestoPDF()" style="color:var(--accent);border-color:var(--accent)"><i class="ti ti-file-invoice"></i> Generar presupuesto</button>
       <button class="btn btn-primary" onclick="saveObra()">Guardar</button>
     </div>
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-presupuesto-pdf" style="padding:20px">
+<div class="modal-overlay" id="modal-prespdf" style="padding:20px">
   <div class="modal" style="max-width:720px">
     <div class="modal-title">Generar presupuesto PDF</div>
     <div class="form-grid">
@@ -680,8 +695,6 @@ td.strong { color: var(--text); font-weight: 500; }
         <input id="pp-condicion" value="Anticipo 50% Saldo a contraentrega">
       </div>
     </div>
-
-    <!-- Items -->
     <div style="margin:14px 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)">Ítems</div>
     <div id="pp-items-wrap">
       <div style="display:grid;grid-template-columns:1fr 100px 80px 100px 32px;gap:6px;margin-bottom:4px">
@@ -694,13 +707,11 @@ td.strong { color: var(--text); font-weight: 500; }
       <div id="pp-items"></div>
     </div>
     <button class="btn btn-ghost btn-sm" onclick="addItemPP()" style="margin-top:6px"><i class="ti ti-plus"></i> Agregar ítem</button>
-
     <div style="text-align:right;margin-top:12px;font-size:14px;font-weight:600;color:var(--accent)">
       Total: <span id="pp-total">$0</span>
     </div>
-
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('presupuesto-pdf')">Cancelar</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('modal-prespdf').classList.remove('open')">Cancelar</button>
       <button class="btn btn-primary" onclick="generarPDF()"><i class="ti ti-printer"></i> Generar PDF</button>
     </div>
   </div>
@@ -1162,8 +1173,14 @@ window.renderObras = function() {
   if (window.obrasSectorFilter!=='Todos') obras = obras.filter(o=>o.sector===window.obrasSectorFilter);
   const estado = document.getElementById('filter-estado')?.value;
   const cli = document.getElementById('filter-cliente')?.value.toLowerCase();
+  const otQ = document.getElementById('filter-ot')?.value.toLowerCase();
+  const semDesde = +document.getElementById('filter-semana-desde')?.value||0;
+  const semHasta = +document.getElementById('filter-semana-hasta')?.value||0;
   if (estado) obras = obras.filter(o=>o.estado===estado);
   if (cli) obras = obras.filter(o=>(o.cliente||'').toLowerCase().includes(cli));
+  if (otQ) obras = obras.filter(o=>(o.ot||'').toLowerCase().includes(otQ)||(o.desc||'').toLowerCase().includes(otQ));
+  if (semDesde) obras = obras.filter(o=>(+o.semana||0)>=semDesde);
+  if (semHasta) obras = obras.filter(o=>(+o.semana||0)<=semHasta);
   obras = obras.sort((a,b)=>(+b.semana||0)-(+a.semana||0));
 
   document.getElementById('obras-count').textContent = obras.length + ' obras';
@@ -1342,6 +1359,12 @@ window.renderCobranzas = function() {
   let show = cobr;
   if (window.cobTab==='pendientes') show = pend;
   else if (window.cobTab==='cobradas') show = cobradas;
+  const cobrQ = document.getElementById('cobr-filter-cliente')?.value.toLowerCase();
+  const cobrE = document.getElementById('cobr-filter-estado')?.value;
+  if (cobrQ) show = show.filter(c=>(c.cliente||'').toLowerCase().includes(cobrQ)||(c.ot||'').toLowerCase().includes(cobrQ));
+  if (cobrE) show = show.filter(c=>c.estado===cobrE);
+  const cntEl = document.getElementById('cobr-count');
+  if (cntEl) cntEl.textContent = show.length + ' registros';
 
   document.getElementById('cobr-tbody').innerHTML = show.map(c => {
     const dias = diasDesdeHoy(c.vencimiento);
@@ -1583,6 +1606,79 @@ window.delObra = async id => { if(confirm('¿Eliminar esta obra?')) await delete
 window.quickChangeEstado = async (id, val) => {
   await updateDoc_('obras', id, { estado: val, cobr: val });
   showToast('Estado actualizado: ' + val);
+};
+
+window.limpiarFiltros = () => {
+  ['filter-ot','filter-cliente','filter-semana-desde','filter-semana-hasta'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  const fe = document.getElementById('filter-estado'); if(fe) fe.value = '';
+  window.obrasSectorFilter = 'Todos';
+  renderObras();
+};
+
+// EXPORTAR EXCEL
+window.exportarExcel = () => {
+  const obras = [...window.DB.obras].sort((a,b)=>(+b.semana||0)-(+a.semana||0));
+  if (!obras.length) { showToast('No hay obras para exportar'); return; }
+  const headers = ['Fecha','Semana','OT','Descripción','Arquitecto','Cliente','Sector','Vendedor',
+    'Estado','Neto','Bruto','Gastos','F.Prod.Comp','F.Prod.Real','F.Col.Comp','F.Col.Real',
+    'OC/OP','Nro Factura','F.Factura','Estado Cobranza','Comentarios',
+    'Nota Producción','Nota Colocaciones','Nota Diseño','Nota Ventas','Nota Compras'];
+  const rows = obras.map(o => {
+    const n = o.notas_sector||{};
+    return [o.fecha||'',o.semana||'',o.ot||'',o.desc||'',o.arquitecto||'',o.cliente||'',
+      o.sector||'',o.vendedor||'',o.estado||'',+o.neto||0,+o.bruto||0,+o.gastos||0,
+      o.fprod_c||'',o.fprod_r||'',o.fcol_c||'',o.fcol_r||'',o.oc||'',o.nrfc||'',o.ffc||'',
+      o.cobr||'',o.comentarios||'',n['Producción']||'',n['Colocaciones']||'',n['Diseño']||'',n['Ventas']||'',n['Compras']||''];
+  });
+  const doExport = () => {
+    const ws = window.XLSX.utils.aoa_to_sheet([headers,...rows]);
+    ws['!cols'] = headers.map((_,i)=>({wch:i<=2?8:i<=4?30:i<=7?15:25}));
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb,ws,'Obras 2026');
+    const fecha = new Date().toLocaleDateString('es-AR').replace(/\//g,'-');
+    window.XLSX.writeFile(wb,`TIZ_Obras_${fecha}.xlsx`);
+    showToast(`${obras.length} obras exportadas a Excel`);
+  };
+  if (!window.XLSX) {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = doExport;
+    document.head.appendChild(s);
+  } else { doExport(); }
+};
+
+// CARGAR COBRANZAS DESDE OTs
+window.cargarDesdeOTs = async () => {
+  const obrasOK = window.DB.obras.filter(o=>['Entregado','Facturado'].includes(o.estado)&&+o.neto>0);
+  if (!obrasOK.length) { showToast('No hay obras entregadas/facturadas'); return; }
+  const otsCargadas = new Set(window.DB.cobranzas.map(c=>c.ot).filter(Boolean));
+  const nuevas = obrasOK.filter(o=>!o.ot||!otsCargadas.has(o.ot));
+  if (!nuevas.length) { showToast('Todas las OTs ya están en cobranzas'); return; }
+  if (!confirm(`¿Agregar ${nuevas.length} obra(s) a cobranzas?`)) return;
+  for (const o of nuevas) {
+    await addDoc_('cobranzas',{ot:o.ot||'',cliente:o.cliente||'',desc:o.desc||'',
+      nrfc:o.nrfc||'',importe:+o.neto||0,vencimiento:'',fechaCobro:'',estado:'Pendiente',comentarios:''});
+  }
+  showToast(`${nuevas.length} obras cargadas en cobranzas`);
+};
+
+// NÚMERO AUTOMÁTICO DE PRESUPUESTO
+window.abrirPresupuestoPDF = () => {
+  const obraId = window.editingId.obra;
+  const obra = obraId ? window.DB.obras.find(x=>x.id===obraId) : null;
+  const presNros = window.DB.presupuestos.map(p=>parseInt(p.nro)||0);
+  const otNros = window.DB.obras.map(o=>parseInt(o.ot)||0);
+  const maxNro = Math.max(0,...presNros,...otNros);
+  document.getElementById('pp-nro').value = (maxNro+1).toString().padStart(4,'0');
+  document.getElementById('pp-cliente').value = obra?.cliente||'';
+  document.getElementById('pp-nota').value = 'Los precios cotizados se encuentran a valores netos';
+  document.getElementById('pp-condicion').value = 'Anticipo 50% Saldo a contraentrega';
+  document.getElementById('pp-validez').value = '7';
+  window.ppItems = obra?[{desc:obra.desc||'',precio:+obra.neto||0,cant:1}]:[{desc:'',precio:0,cant:1}];
+  renderPPItems();
+  document.getElementById('modal-prespdf').classList.add('open');
 };
 
 window.saveObra = async () => {
