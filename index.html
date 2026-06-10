@@ -1737,6 +1737,8 @@ window.cerrarSugerencias = () => {
   const dd = document.getElementById('clientes-dropdown');
   if (dd) dd.style.display = 'none';
 };
+
+window.crearTareaDesdeNota = (sector) => {
   const sectorKeys = {'Producción':'produccion','Colocaciones':'colocaciones','Diseño':'diseno','Ventas':'ventas','Compras':'compras'};
   const nota = document.getElementById('nota-'+sectorKeys[sector])?.value.trim();
   const obraId = window.editingId.obra;
